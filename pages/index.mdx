@@ -1,3 +1,7 @@
+import Layout from '../components/layout'
+
+export const title = 'Home'
+
 Hi, I'm Griffin. This is my website.
 <br></br>
 *soon:* staff engineer @ [ibm](https://ibm.com)
@@ -7,3 +11,5 @@ Hi, I'm Griffin. This is my website.
 * research @ [utd center for machine learning](https://cs.utdallas.edu/cmachinelearning/)
 * senator @ [utd student government](https://sg.utdallas.edu)
 * runner @ [utd cross country & track](https://utdcomets.com/sports/cross-country/roster)
+
+export default ({ children }) => <Layout title={title}>{children}</Layout>

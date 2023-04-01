@@ -17,7 +17,7 @@ export default function Navbar() {
                     <div className="flex flex-1 items-center justify-left">
                         <div className="">
                             <div className="flex space-x-4">
-                                <a href="#"
+                                <a href="/"
                                     className={classNames(
                                         'text-white',
                                         'px-3 py-2 rounded-md text-sm'
@@ -62,6 +62,16 @@ export default function Navbar() {
                                             <Menu.Item>
                                                 {({ active }) => (
                                                     <a
+                                                        href="https://mobility.gcd.dev/"
+                                                        className={classNames(active ? 'bg-gray-100' : '', 'block px-4 py-2 text-sm text-gray-700')}
+                                                    >
+                                                        Mobility ML
+                                                    </a>
+                                                )}
+                                            </Menu.Item>
+                                            <Menu.Item>
+                                                {({ active }) => (
+                                                    <a
                                                         href="https://personal.utdallas.edu/~gcd/label"
                                                         className={classNames(active ? 'bg-gray-100' : '', 'block px-4 py-2 text-sm text-gray-700')}
                                                     >
@@ -86,6 +96,16 @@ export default function Navbar() {
                                                         className={classNames(active ? 'bg-gray-100' : '', 'block px-4 py-2 text-sm text-gray-700')}
                                                     >
                                                         Pace Calculator
+                                                    </a>
+                                                )}
+                                            </Menu.Item>
+                                            <Menu.Item>
+                                                {({ active }) => (
+                                                    <a
+                                                        href="https://utdal.github.io/sg-budget-breakdown/"
+                                                        className={classNames(active ? 'bg-gray-100' : '', 'block px-4 py-2 text-sm text-gray-700')}
+                                                    >
+                                                        UTD Budget Breakdown
                                                     </a>
                                                 )}
                                             </Menu.Item>

@@ -29,6 +29,10 @@ ul {
   list-style-position: inside;
 }
 
+ul ul {
+  padding-left: 2rem;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -43,4 +47,24 @@ ul {
   background: theme('colors.sky.400');
   text-shadow: none;
   color: white;
+}
+
+h2 {
+  font-weight: 700;
+  font-size: 16pt;
+}
+
+p {
+  font-size: 13pt;
+}
+
+blockquote {
+  position: relative;
+  margin: 1rem 0 1rem 0;
+  padding: 0 0 0 1rem;
+  border-left: 0.2em solid theme('colors.sky.400');
+}
+
+.CS6375 {
+  font-family: 'Montserrat', sans-serif;
 }
