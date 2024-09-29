@@ -35,7 +35,6 @@ export default function Layout({ children, title } : any) {
 
                 <link rel="preconnect" href="https://fonts.googleapis.com"></link>
                 <link rel="preconnect" href="https://fonts.gstatic.com"></link>
-                <link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;700&family=Montserrat&display=swap" rel="stylesheet"></link>
             </Head>
             <Navbar />
             <div className={pageClass}>
