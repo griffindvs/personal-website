@@ -1,11 +1,27 @@
-import Layout from '../components/layout'
+import CoreLayout from '../components/layouts/core';
+import PageLayout from '../components/layouts/page';
 
-export const title = 'Home'
+export const title = 'Home';
 
 Hi, I'm Griffin. This is my website.
+
 <br></br>
-*currently:* devops engineer @ [ibm](https://ibm.com)
+I'm a software engineer at [IBM](https://ibm.com) bringing cloud-native
+applications to enterprises. I currently work on deployment and lifecycle
+management of [IBM Cloud Pak for
+AIOps](https://www.ibm.com/products/cloud-pak-for-aiops) and the data systems
+powering it.
 
-*previously:* cs @ [ut dallas](https://utdallas.edu)
+<br></br>
 
-export default ({ children }) => <Layout title={title}>{children}</Layout>
+I previously studied computer science at [UT
+Dallas](https://utdallas.edu) where I created [tools for
+students](https://utdal.github.io/sg-budget-breakdown/) and built [machine
+learning models to study economic
+mobility](https://hdl.handle.net/10735.1/9926).
+
+export default ({ children }) => (
+  <CoreLayout title={title}>
+    <PageLayout title={title}>{children}</PageLayout>
+  </CoreLayout>
+);
