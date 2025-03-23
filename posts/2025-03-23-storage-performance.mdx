@@ -1,0 +1,74 @@
+---
+title: 'Storage performance in the cloud'
+date: '2025-03-23'
+summary: 'A few thoughts on measuring and validating storage performance in cloud environments.'
+---
+
+# Storage performance in the cloud
+When an application running in a Kubernetes pod writes data to a file, that data travels through multiple layers before reaching physical storage. This can involve the actual file I/O in the application, layers of the container filesystem, network calls to transfer data across nodes, and other layers before it eventually ends with interactions with physical disks.
+<br />
+Each of these layers introduces potential performance bottlenecks, variability, and overhead. What makes cloud storage performance particularly challenging is that many of these layers are opaque to users, with characteristics that can change over time.
+<br />
+## Impact on distributed data systems
+For data-intensive applications like PostgreSQL and Kafka, storage performance is fundamental to overall system behavior.
+<br />
+### PostgreSQL storage performance considerations
+PostgreSQL relies heavily on storage for several critical operations:
+<br />
+* **Write-ahead logging (WAL):** Before any data change is considered committed, PostgreSQL records the change in a log. This sequential write operation is sensitive to storage latency. High latency directly impacts transaction throughput, as delays in writing to the log can delay acknowledgement of changes to the client.
+<br />
+* **Checkpoint processing:** PostgreSQL periodically flushes modified data pages from memory to disk during checkpoints. Storage with inconsistent write performance can cause checkpoint operations to take longer than expected.
+<br />
+* **Random reads:** When data is not available in the buffer cache used by PostgreSQL, it must be read from disk. The speed of random reads directly affects query performance.
+<br />
+In Kubernetes, a PostgreSQL instance might experience very different performance characteristics compared to traditional deployments because of the additional abstraction layers. For example, a sudden increase in I/O from another pod sharing the same underlying storage infrastructure could cause unexpected latency spikes.
+<br />
+### Kafka Storage Performance Requirements
+Kafka's relationship with storage is also critical:
+<br />
+* **Log segments:** Kafka stores messages in append-only log segments on disk. The sequential write performance of the underlying storage directly determines how quickly Kafka can ingest messages from producers.
+<br />
+* **Consumer lag recovery:** When consumers fall behind, they need to read historical messages from disk. Storage read performance becomes critical when consumers attempt to catch up.
+<br />
+* **Partition rebalancing:** When partitions are moved between brokers, large volumes of data must be read from the storage of one node and written to another. Storage throughput limitations can significantly extend this process.
+<br />
+For both PostgreSQL and Kafka, unpredictable storage performance in cloud environments can lead to cascading problems: slower write operations lead to back-pressure, which causes request queuing, which increases memory usage, which can eventually trigger out-of-memory conditions or other system failures.
+<br />
+## Measuring Storage Performance in Kubernetes
+Given these challenges, accurately measuring storage performance becomes essential. In particular, we often want to assess storage performance at the top of the abstraction stack to accurately measure the performance obtained by our applications. To do this, tools like [fio](https://fio.readthedocs.io/en/latest/fio_doc.html) can be used to run storage benchmarks inside of a Kubernetes job using a mounted persistent volume backed by the storage provider you wish to evaluate.
+<br />
+Storage performance can drift over time due to infrastructure changes, resource contention, or degradation. To address this, regular benchmark testing can be implemented as a part of a broader monitoring strategy using tools like a basic CronJob.
+<br />
+Benchmarking tools like fio provide many configurable parameters to define the I/O profiles of the tests. While generic fio benchmarks provide valuable baseline metrics, the most insightful performance tests are those that accurately mimic your actual application workloads. Each application interacts with storage in unique ways, creating distinct I/O profiles that generic tests may fail to capture.
+<br />
+A relatively simple way to assess the I/O patterns of an application is looking at the process system calls with tools like [strace](https://docs.redhat.com/en/documentation/red_hat_developer_toolset/9/html/user_guide/chap-strace). [kstrace](https://github.com/MichaelWasher/kstrace) provides a kubectl plugin for easily capturing strace logs for Kubernetes pods by collecting the container IDs from the pod status and using [crictl inspect](https://github.com/kubernetes-sigs/cri-tools/blob/master/docs/crictl.md) to obtain the associated process IDs to provide to strace. The strace logs can be filtered to only include file I/O system calls. Analysis of those calls can then be conducted to assess storage usage profiles:
+<br />
+* **Read/write ratio:** How many read vs. write system calls are captured for the process in a given time period?
+<br />
+* **I/O size distribution (block size):** What are the sizes and offsets of the read and write system calls?
+<br />
+* **Access patterns (random vs. sequential):** Are read and write offsets monotonically increasing through a single file descriptor or moving throughout the files?
+<br />
+The results of benchmarks should also be evaluated in the context of the application as each application will have differing requirements for latency and throughput. As a starting point, development teams can run benchmarks to capture the performance of test systems when running heavy workload performance evaluations.
+<br />
+If an application does not perform as well as expected on a customer's system, comparing storage performance with test systems is often a useful first step in diagnosing the problem. Storage benchmarking can also be useful in guiding infrastructure provisioning and cost optimization allowing you to find the cheapest storage provider that satisfies the needs of your application.
+<br />
+By tailoring your storage benchmarks to match application I/O profiles, you transform abstract performance numbers into actionable insights that directly inform infrastructure decisions, capacity planning, and application tuning. This approach bridges the gap between synthetic benchmarks and real-world application behavior, providing a much more reliable foundation for storage performance engineering in Kubernetes environments.
+<br />
+## Optimizing storage performance
+After storage performance has been evaluated, the challenge then becomes optimizing and improving it. One of the key aspects in this is the selection of a storage provider.
+<br />
+### Storage provider selection
+Cloud-native storage like AWS Elastic Block Storage will provide better isolation between workloads within a cluster than self-managed network storage providers. The underlying storage technology is also critical. Durability-focused storage providers will use higher replication factors and may impose differing requirements on when writes are acknowledged to the client. Cloud storage providers also typically offer various tiers with differing performance and costs.
+<br />
+Ceph is an open-source software-defined storage system that provides many options for configuration. Data objects are written to [pools](https://docs.ceph.com/en/reef/rados/operations/pools/#create-a-pool) with individual replication settings. When using Ceph, file I/O is sent over the network to nodes called [object storage daemons](https://docs.ceph.com/en/reef/man/8/ceph-osd/) (OSDs) that read and write the data to local disks.
+<br />
+Even if application workloads are spread across compute nodes, if multiple I/O-heavy applications are using the same block pool and OSDs, the performance of those applications can suffer. Ceph also generally only acknowledges a write as successful to the client once it has been written to all replicas, leading to slower writes when using higher replication factors.
+<br />
+Software-defined storage with I/O over the network differs from local storage, where applications read and write data to the same nodes where they are running. This often provides substantial performance benefits in exchange for data durability because requests and data are not sent over the network and data may not be replicated to the same extent. Care must be taken to ensure sufficient replication occurs at the application-level and that I/O heavy workloads are kept on separate nodes. 
+<br />
+Tools like [local volume manager](https://en.wikipedia.org/wiki/Logical_Volume_Manager_(Linux)) on Linux can help with the management of local storage volumes, providing features like expandable capacity limits. The [LVM Operator](https://github.com/openshift/lvm-operator) helps with the management of LVM volumes in Kubernetes relying on the [topoLVM](https://github.com/topolvm/topolvm) CSI driver to create, modify, and delete logical volumes and volume groups as necessary for Kubernetes persistent volumes.
+<br />
+By carefully evaluating these storage options against your specific application requirements, operational capabilities, and budget constraints, you can select the storage infrastructure that provides the optimal balance of performance, reliability, and cost for your Kubernetes environment.
+<br />
+Storage performance in Kubernetes environments involves a complex interplay of multiple abstraction layers. By understanding these layers and systematically measuring performance characteristics, engineers can make informed decisions about infrastructure design, application architecture, and operational practices.

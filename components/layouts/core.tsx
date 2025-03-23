@@ -3,6 +3,7 @@ import Footer from '../footer/footer';
 import Social from '../social/social';
 
 import Head from 'next/head';
+import { GoogleAnalytics } from '@next/third-parties/google';
 
 export default function CoreLayout({ children, title }: any) {
   let page_title = title + ' - Griffin Davis';
@@ -69,6 +70,7 @@ export default function CoreLayout({ children, title }: any) {
       <>{children}</>
       <Social />
       <Footer />
+      <GoogleAnalytics gaId="G-KS188J5P61" />
     </>
   );
 }

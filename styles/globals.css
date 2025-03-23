@@ -96,9 +96,28 @@ p {
   line-height: 2ch;
 }
 
-.post-content p {
+.post-content h1 {
   font-size: 16pt;
+  font-weight: 600;
+}
+
+.post-content h2 {
+  font-size: 15pt;
+  font-weight: 600;
+}
+
+.post-content h3 {
+  font-size: 14pt;
+  font-weight: 600;
+}
+
+.post-content p {
+  font-size: 14pt;
   font-weight: 400;
+}
+
+.post-content strong {
+  font-weight: 500;
 }
 
 .post-meta {
@@ -108,10 +127,11 @@ p {
 .post-meta h1 {
   font-size: 20pt;
   font-weight: 600;
+  padding-bottom: 0.5ch;
 }
 
 .post-meta time {
-  font-size: 18pt;
+  font-size: 14pt;
   font-weight: 400;
   font-style: italic;
 }
