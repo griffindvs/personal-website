@@ -9,9 +9,11 @@ When an application running in a Kubernetes pod writes data to a file, that data
 <br />
 Each of these layers introduces potential performance bottlenecks, variability, and overhead. What makes cloud storage performance particularly challenging is that many of these layers are opaque to users, with characteristics that can change over time.
 <br />
+
 ## Impact on distributed data systems
 For data-intensive applications like PostgreSQL and Kafka, storage performance is fundamental to overall system behavior.
 <br />
+
 ### PostgreSQL storage performance considerations
 PostgreSQL relies heavily on storage for several critical operations:
 <br />
@@ -23,6 +25,7 @@ PostgreSQL relies heavily on storage for several critical operations:
 <br />
 In Kubernetes, a PostgreSQL instance might experience very different performance characteristics compared to traditional deployments because of the additional abstraction layers. For example, a sudden increase in I/O from another pod sharing the same underlying storage infrastructure could cause unexpected latency spikes.
 <br />
+
 ### Kafka Storage Performance Requirements
 Kafka's relationship with storage is also critical:
 <br />
@@ -34,6 +37,7 @@ Kafka's relationship with storage is also critical:
 <br />
 For both PostgreSQL and Kafka, unpredictable storage performance in cloud environments can lead to cascading problems: slower write operations lead to back-pressure, which causes request queuing, which increases memory usage, which can eventually trigger out-of-memory conditions or other system failures.
 <br />
+
 ## Measuring Storage Performance in Kubernetes
 Given these challenges, accurately measuring storage performance becomes essential. In particular, we often want to assess storage performance at the top of the abstraction stack to accurately measure the performance obtained by our applications. To do this, tools like [fio](https://fio.readthedocs.io/en/latest/fio_doc.html) can be used to run storage benchmarks inside of a Kubernetes job using a mounted persistent volume backed by the storage provider you wish to evaluate.
 <br />
@@ -55,9 +59,12 @@ If an application does not perform as well as expected on a customer's system, c
 <br />
 By tailoring your storage benchmarks to match application I/O profiles, you transform abstract performance numbers into actionable insights that directly inform infrastructure decisions, capacity planning, and application tuning. This approach bridges the gap between synthetic benchmarks and real-world application behavior, providing a much more reliable foundation for storage performance engineering in Kubernetes environments.
 <br />
+
+
 ## Optimizing storage performance
 After storage performance has been evaluated, the challenge then becomes optimizing and improving it. One of the key aspects in this is the selection of a storage provider.
 <br />
+
 ### Storage provider selection
 Cloud-native storage like AWS Elastic Block Storage will provide better isolation between workloads within a cluster than self-managed network storage providers. The underlying storage technology is also critical. Durability-focused storage providers will use higher replication factors and may impose differing requirements on when writes are acknowledged to the client. Cloud storage providers also typically offer various tiers with differing performance and costs.
 <br />
@@ -67,8 +74,18 @@ Even if application workloads are spread across compute nodes, if multiple I/O-h
 <br />
 Software-defined storage with I/O over the network differs from local storage, where applications read and write data to the same nodes where they are running. This often provides substantial performance benefits in exchange for data durability because requests and data are not sent over the network and data may not be replicated to the same extent. Care must be taken to ensure sufficient replication occurs at the application-level and that I/O heavy workloads are kept on separate nodes. 
 <br />
-Tools like [local volume manager](https://en.wikipedia.org/wiki/Logical_Volume_Manager_(Linux)) on Linux can help with the management of local storage volumes, providing features like expandable capacity limits. The [LVM Operator](https://github.com/openshift/lvm-operator) helps with the management of LVM volumes in Kubernetes relying on the [topoLVM](https://github.com/topolvm/topolvm) CSI driver to create, modify, and delete logical volumes and volume groups as necessary for Kubernetes persistent volumes.
+Tools like [local volume manager](https://en.wikipedia.org/wiki/Logical_Volume_Manager_(Linux)) on Linux can help with the management of local storage volumes, providing features like expandable capacity limits. The [LVM Operator](https://github.com/openshift/lvm-operator) helps with the management of LVM volumes in Kubernetes relying on the [TopoLVM](https://github.com/topolvm/topolvm) CSI driver to create, modify, and delete logical volumes and volume groups as necessary for Kubernetes persistent volumes.
 <br />
+
+## Real-world applications
 By carefully evaluating these storage options against your specific application requirements, operational capabilities, and budget constraints, you can select the storage infrastructure that provides the optimal balance of performance, reliability, and cost for your Kubernetes environment.
 <br />
 Storage performance in Kubernetes environments involves a complex interplay of multiple abstraction layers. By understanding these layers and systematically measuring performance characteristics, engineers can make informed decisions about infrastructure design, application architecture, and operational practices.
+<br />
+In my role at IBM working on [Cloud Pak for AIOps](https://www.ibm.com/products/cloud-pak-for-aiops), I've seen firsthand the effects of insufficient storage performance on the performance and reliability of distributed data systems. Many of our customers push our software to its limit &mdash; integrating with a firehose of alerts, logs, and topology data so our systems can make sense of the chaos.
+<br />
+As this data is sent through our Kafka cluster managed by [Strimzi](https://github.com/strimzi/strimzi-kafka-operator), disk I/O latency leads to instability. If brokers are unable to process messages quickly enough, they become out of sync, violating [minimum in-sync replica settings](https://kafka.apache.org/documentation/#replication). This delays the receipt of messages by consumers and can also stall rolling upgrades, as the Strimzi operator will halt upgrades if there is an insufficient number of in-sync replicas.
+<br />
+The cascading effects of slow storage continues in PostgreSQL, one of the primary data stores in AIOps. As transaction latency rises and throughput drops, long-running queries can block maintenance tasks like [autovacuum](https://www.enterprisedb.com/blog/when-autovacuum-does-not-vacuum) resulting in a growth of [dead tuples](https://www.cs.cmu.edu/~pavlo/blog/2023/04/the-part-of-postgresql-we-hate-the-most.html), expanding disk usage.
+<br />
+Given these effects and the broader challenges of ensuring performance in customer-managed infrastructure, we built a simple storage benchmarking utility into our [aiopsctl CLI](https://github.com/IBM/aiopsctl). This utility relies on the same strategy discussed here: running fio benchmarks in a Kubernetes job. With minimal complexity we can get a quick snapshot of the storage performance obtainable by our applications.
