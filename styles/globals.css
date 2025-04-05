@@ -116,6 +116,10 @@ p {
   font-weight: 400;
 }
 
+code {
+  font-size: 12pt;
+}
+
 .post-content strong {
   font-weight: 500;
 }

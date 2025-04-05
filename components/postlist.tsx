@@ -8,6 +8,13 @@ type PostListProps = {
 };
 
 const PostList: FC<PostListProps> = ({ posts }) => {
+  posts.sort((a, b) => {
+    const dateA = new Date(a.frontMatter.date);
+    const dateB = new Date(b.frontMatter.date);
+    // Most recent dates first.
+    return dateB.getTime() - dateA.getTime();
+  });
+
   return (
     <div>
       <table className="post-table">

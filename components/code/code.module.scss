@@ -1,0 +1,41 @@
+.code {
+  border: 1px solid #484848;
+  border-radius: 5px;
+  overflow: hidden;
+  font-family: 'Fira Code', monospace;
+  font-size: 10pt;
+
+  code {
+    font-size: 10pt;
+  }
+}
+
+.codeHeader {
+  font-size: 11pt;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f5f5f5;
+  padding-left: 0.5rem;
+  font-weight: bold;
+  border-bottom: 1px solid #484848;
+}
+
+.codeHeaderLink:hover {
+  text-decoration: none;
+}
+
+.copyButton {
+  color: #000000;
+  padding-right: 0.5rem;
+  cursor: pointer;
+}
+
+.copyButton svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.codeBlock {
+  margin: 0 !important;
+}

@@ -1,0 +1,221 @@
+---
+title: 'Transformations with Kubernetes controllers'
+date: '2025-04-05'
+summary: 'Some ideas and tools for managing object transformations with Kubernetes controllers written in Go.'
+---
+
+import Code from '../components/Code';
+
+## Motivations
+
+At IBM, I work on a product called [Cloud Pak for AIOps](https://www.ibm.com/products/cloud-pak-for-aiops). It is a self-hosted IT operations management tool that runs on Kubernetes. Because it is self-hosted and is composed of dozens of microservices, one of the key challenges we face is keeping installation and upgrade simple.
+<br />
+We use a handful of [operators](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) (each with one or more [custom resources](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) and [controllers](https://kubernetes.io/docs/concepts/architecture/controller/)) to deploy and manage all the Kubernetes resources within the application. These controllers manage a wide array of resources, both ones native in Kubernetes as well as custom resources.
+<br />
+Of the many resources managed by our Go-based controllers, some provide Go types while others are managed through [unstructured](https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured) (a `map[string]interface{}` in Go with Kubernetes type meta). Across all of these objects, there are often common actions we wish to take &mdash; applying labels, setting replica counts, configuring [owner references](https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/), etc.
+<br />
+With [github.com/griffindvs/stencil](https://github.com/griffindvs/stencil), I started putting together some tools to assist with these types of operations. This library is built on many of the same core functions as [Manifestival](https://github.com/manifestival/manifestival), but with an extension to Go typed Kubernetes objects which can take advantage of [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) caching. After spending some time with the library, I did not end up completely satisfied with the user experience, but I find some of the tools and ideas useful in other areas.
+<br />
+
+## Generic transformations
+
+As provided in [Manifestival](https://github.com/manifestival/manifestival), a useful way for conducting generic transformations on Kubernetes resources is to manage them with unstructured. A basic transformer could apply an owner reference to an object:
+<br />
+<Code
+  code={`
+  // Transformer conducts in-place modifications to a provided object.
+  type Transformer func(u *unstructured.Unstructured) error
+
+  // OwnerReferenceTransformer returns a transformer that adds
+  // an owner reference to the given object.
+  func OwnerReferenceTransformer(
+    k8sClient client.Client, owner client.Object,
+  ) Transformer {
+    return func(u *unstructured.Unstructured) error {
+      if u == nil {
+        return nil
+      }
+
+      if k8sClient == nil {
+        return errors.New("unable to add owner reference with nil client")
+      }
+
+      ownerGvk, err := apiutil.GVKForObject(owner, k8sClient.Scheme())
+      if err != nil {
+        return err
+      }
+
+      u.SetOwnerReferences(
+        []metav1.OwnerReference{*metav1.NewControllerRef(owner, ownerGvk)},
+      )
+      return nil
+    }
+  }
+  `}
+  language="go"
+  fileName="transform.go"
+  fileLink="https://github.com/griffindvs/stencil/blob/main/pkg/transform/transform.go"
+/>
+<br />
+A more complex transformation might take into account the current state of the object in the cluster. In [stencil](https://github.com/griffindvs/stencil), I refer to these as context-aware transformers:
+<br />
+<Code
+  code={`
+  // ContextAwareTransformer conducts in-place modifications to a
+  // provided object with the context of the current object on the cluster.
+  type ContextAwareTransformer func(desired *unstructured.Unstructured, current *unstructured.Unstructured) error
+
+  // NewContextAwareTransformer returns a ContextAwareTransformer
+  // with the current object on the cluster.
+  func NewContextAwareTransformer(
+    ctx context.Context,
+    k8sClient client.Client,
+    fn ContextAwareTransformer,
+  ) Transformer {
+    return func(u *unstructured.Unstructured) error {
+      if u == nil {
+        return nil
+      }
+
+      // Get the current object on the cluster.
+      var current = &unstructured.Unstructured{}
+      current.SetGroupVersionKind(u.GroupVersionKind())
+      err := k8sClient.Get(ctx, client.ObjectKeyFromObject(u), current)
+      if err != nil {
+        if kerrors.IsNotFound(err) {
+          return fn(u, nil)
+        }
+
+        return err
+      }
+
+      // Run the provided transformer with both the new and current objects.
+      return fn(u, current)
+    }
+  }
+  `}
+  language="go"
+  fileName="transform.go"
+  fileLink="https://github.com/griffindvs/stencil/blob/main/pkg/transform/transform.go"
+/>
+<br />
+A context-aware transformation can be used for things like preventing inadvertent reductions in scale that could lead to failures. For example, perhaps the volume capacity in the claim template of a StatefulSet is configurable, but you want to prevent attempts to reduce the capacity. Before you apply the updated StatefulSet, you could transform the resource to retain the larger capacity from the object on the cluster.
+<br />
+
+## Converting between representations
+
+To transform objects as unstructured while retaining some of the benefits of Go typed objects, we need a mechanism to switch between the representations. Moving from typed to unstructured is fairly simple:
+<br />
+<Code
+  code={`
+  // ToUnstructured converts the given client.Object to an unstructured.
+  func ToUnstructured(o client.Object) (unstructured.Unstructured, error) {
+    u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(o)
+    return unstructured.Unstructured{Object: u}, err
+  }
+  `}
+  language="go"
+  fileName="tools.go"
+  fileLink="https://github.com/griffindvs/stencil/blob/main/internal/common/tools.go"
+/>
+<br />
+The one catch is that Go typed objects do not include type meta, since that information is inherent in the Go type. To address this, we can set the GVK of the unstructured after the conversion:
+<br/>
+<Code
+  code={`
+  // SetGvkFromScheme populates the GroupVersionKind of an
+  // unstructured object using the type stored in the client
+  // scheme for the given client.Object.
+  func SetGvkFromScheme(
+    k8sClient client.Client,
+    unstruct *unstructured.Unstructured,
+    typed client.Object,
+  ) error {
+    if k8sClient == nil {
+      return errors.New("unable to set GVK from scheme with nil client")
+    }
+
+    if unstruct == nil {
+      return errors.New("unable to set GVK on nil unstructured")
+    }
+
+    typedGvk, err := apiutil.GVKForObject(typed, k8sClient.Scheme())
+    if err != nil {
+      return err
+    }
+
+    unstruct.SetGroupVersionKind(typedGvk)
+    return nil
+  }
+  `}
+  language="go"
+  fileName="tools.go"
+  fileLink="https://github.com/griffindvs/stencil/blob/main/internal/common/tools.go"
+/>
+<br />
+Moving the other direction is a bit more challenging. To do this generically, we need to create a pointer to whatever the type is that we determine at runtime:
+<br />
+<Code
+  code={`
+  // NewRuntimeType return a pointer to a new value with
+  // type determined at runtime.
+  func NewRuntimeType[T any](t T) any {
+    return reflect.New(reflect.TypeOf(t).Elem()).Interface()
+  }
+  `}
+  language="go"
+  fileName="tools.go"
+  fileLink="https://github.com/griffindvs/stencil/blob/main/internal/common/tools.go"
+/>
+<br />
+We can then switch from unstructured to that type:
+<Code
+  code={`
+  // Declare a pointer to the type of object (determined at runtime).
+  var typed = common.NewRuntimeType(obj)
+
+  // Convert from unstructured back to the typed object.
+  err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, typed)
+  if err != nil {
+    return nil, err
+  }
+  `}
+  language="go"
+  fileName="transform.go"
+  fileLink="https://github.com/griffindvs/stencil/blob/main/transform/transform.go"
+/>
+<br />
+To then treat that type as a Kubernetes object, we need to assert that it implements `client.Object`:
+<br />
+<Code
+  code={`
+  // ClientObjectInterface returns the reflect.Type for the
+  // client.Object interface.
+  func ClientObjectInterface() reflect.Type {
+    return reflect.TypeOf((*client.Object)(nil)).Elem()
+  }
+
+  // ImplementsClientObject checks if the provided object implements
+  // client.Object, and if so, returns that object as a client.Object.
+  func ImplementsClientObject(obj any) (client.Object, error) {
+    objectType := reflect.TypeOf(obj)
+    if objectType.Implements(ClientObjectInterface()) {
+      clientObject, ok := obj.(client.Object)
+      if !ok {
+        return nil, fmt.Errorf(
+          "unable to convert %v to client.Object", reflect.TypeOf(obj),
+        )
+      }
+
+      return clientObject, nil
+    }
+
+    return nil, fmt.Errorf(
+      "%v does not implement %v", objectType, ClientObjectInterface(),
+    )
+  }
+  `}
+  language="go"
+  fileName="tools.go"
+  fileLink="https://github.com/griffindvs/stencil/blob/main/internal/common/tools.go"
+/>

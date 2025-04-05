@@ -4,6 +4,7 @@ import matter from 'gray-matter';
 import { promisify } from 'util';
 import { serialize } from 'next-mdx-remote/serialize';
 import { MDXRemoteSerializeResult } from 'next-mdx-remote';
+import remarkGfm from 'remark-gfm';
 
 export type Post = {
   slug: string;
@@ -27,7 +28,11 @@ export const getAllPosts = async () => {
       const fileContent = fs.readFileSync(filePath, 'utf-8');
 
       const { data, content } = matter(fileContent); // Read frontmatter and content
-      const mdxSource = await serialize(content); // Serialize the MDX content
+      const mdxSource = await serialize(content, {
+        mdxOptions: {
+          remarkPlugins: [remarkGfm],
+        },
+      }); // Serialize the MDX content
 
       return {
         slug: filename.replace(/\.mdx$/, ''),

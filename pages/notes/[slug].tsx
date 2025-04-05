@@ -4,6 +4,7 @@ import { MDXRemote } from 'next-mdx-remote';
 
 import CoreLayout from '../../components/layouts/core';
 import PageLayout from '../../components/layouts/page';
+import Code from '../../components/code/code';
 
 type Post = {
   slug: string;
@@ -19,6 +20,8 @@ type PostPageProps = {
 };
 
 const PostPage = ({ post }: PostPageProps) => {
+  const components = { Code };
+
   return (
     <CoreLayout title={post.frontMatter.title}>
       <PageLayout title={post.frontMatter.title}>
@@ -28,7 +31,7 @@ const PostPage = ({ post }: PostPageProps) => {
             <time>{post.frontMatter.date}</time>
           </div>
           <div>
-            <MDXRemote {...post.mdxSource} />
+            <MDXRemote {...post.mdxSource} components={components} />
           </div>
         </div>
       </PageLayout>
