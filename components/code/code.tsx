@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
-import SyntaxHighlighter from 'react-syntax-highlighter/dist/cjs/prism-light';
-import { oneLight } from 'react-syntax-highlighter/dist/cjs/styles/prism';
-import go from 'react-syntax-highlighter/dist/cjs/languages/prism/go';
+import dynamic from 'next/dynamic';
 import { ClipboardIcon, CheckIcon } from '@heroicons/react/24/outline';
 
 import styles from './code.module.scss';
 
-// Register each desired language individually to reduce bundle size.
-SyntaxHighlighter.registerLanguage('go', go);
+const Highlighter = dynamic(() => import('./highlighter'), { ssr: false });
 
 export default function Code({
   code,
@@ -50,14 +47,13 @@ export default function Code({
           {copied ? <CheckIcon /> : <ClipboardIcon />}
         </button>
       </div>
-      <SyntaxHighlighter
+      <Highlighter
         language={language}
-        style={oneLight}
         showLineNumbers={true}
         className={styles.codeBlock}
       >
         {code.trim()}
-      </SyntaxHighlighter>
+      </Highlighter>
     </div>
   );
 }
