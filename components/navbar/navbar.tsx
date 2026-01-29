@@ -1,5 +1,11 @@
 import { Fragment, useState } from 'react';
-import { Menu, Transition } from '@headlessui/react';
+import {
+  Menu,
+  MenuItem,
+  MenuItems,
+  MenuButton,
+  Transition,
+} from '@headlessui/react';
 
 import styles from './navbar.module.scss';
 
@@ -23,7 +29,10 @@ function NavbarItem({ text, link }: NavbarItemProps) {
       onMouseLeave={() => setIsHovered(false)}
     >
       <span className="sr-only">Open {text}</span>
-      <a href={link} className={classNames(styles.navitem, anchorStyles)}>
+      <a
+        href={link || '#'}
+        className={classNames(styles.navitem, anchorStyles)}
+      >
         /{text} {isHovered && '→'}
       </a>
     </div>
@@ -54,9 +63,9 @@ export default function Navbar() {
           <div className="absolute inset-y-0 right-0 flex items-center pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0 cursor-pointer">
             <NavbarItem text="notes" link="/notes" />
             <Menu as="div" className="relative ml-3">
-              <Menu.Button className="flex px-2">
+              <MenuButton className="flex px-2">
                 <NavbarItem text="tools" link="" />
-              </Menu.Button>
+              </MenuButton>
               <Transition
                 as={Fragment}
                 enter="transition ease-out duration-100"
@@ -66,47 +75,47 @@ export default function Navbar() {
                 leaveFrom="transform opacity-100 scale-100"
                 leaveTo="transform opacity-0 scale-95"
               >
-                <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                  <Menu.Item>
-                    {({ active }) => (
+                <MenuItems className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <MenuItem>
+                    {({ focus }) => (
                       <a
                         href="/mobility"
                         className={classNames(
-                          active ? 'bg-gray-100' : '',
+                          focus ? 'bg-gray-100' : '',
                           'block px-4 py-2 text-sm text-gray-700'
                         )}
                       >
                         Mobility ML
                       </a>
                     )}
-                  </Menu.Item>
-                  <Menu.Item>
-                    {({ active }) => (
+                  </MenuItem>
+                  <MenuItem>
+                    {({ focus }) => (
                       <a
                         href="https://pace.griffindvs.com"
                         className={classNames(
-                          active ? 'bg-gray-100' : '',
+                          focus ? 'bg-gray-100' : '',
                           'block px-4 py-2 text-sm text-gray-700'
                         )}
                       >
                         Pace Calculator
                       </a>
                     )}
-                  </Menu.Item>
-                  <Menu.Item>
-                    {({ active }) => (
+                  </MenuItem>
+                  <MenuItem>
+                    {({ focus }) => (
                       <a
                         href="https://utdal.github.io/sg-budget-breakdown/"
                         className={classNames(
-                          active ? 'bg-gray-100' : '',
+                          focus ? 'bg-gray-100' : '',
                           'block px-4 py-2 text-sm text-gray-700'
                         )}
                       >
                         UTD Budget Breakdown
                       </a>
                     )}
-                  </Menu.Item>
-                </Menu.Items>
+                  </MenuItem>
+                </MenuItems>
               </Transition>
             </Menu>
           </div>
