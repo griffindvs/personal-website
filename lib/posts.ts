@@ -32,6 +32,7 @@ export const getAllPosts = async () => {
         mdxOptions: {
           remarkPlugins: [remarkGfm],
         },
+        blockJS: false,
       }); // Serialize the MDX content
 
       return {
